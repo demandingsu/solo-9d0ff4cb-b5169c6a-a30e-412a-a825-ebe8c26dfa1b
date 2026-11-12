@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>市政绿化养护服务采购项目评标纪要</title>
+<style>
+body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; margin: 2rem; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #999; padding: .5rem .7rem; text-align: left; }
+th { background: #f0f3f7; }
+.nav a { margin-right: 1rem; }
+</style>
+</head>
+<body>
+<article>
+  <h1>市政绿化养护服务采购项目评标纪要</h1>
+
+  <p class="nav">
+    <a href="/login.html">评标系统登录（非附表链接，应被忽略）</a>
+    <a href="https://example.gov/other-city/minutes.html">外市平台纪要（外站链接，应被忽略）</a>
+    <a href="#section-bidders">页内锚点（应被忽略）</a>
+  </p>
+
+  <section>
+    <h2>一、评标基本信息</h2>
+    <table>
+      <tr><th>项目编号</th><td>GSB-2026-001</td></tr>
+      <tr><th>采购单位</th><td>某市园林绿化管理局</td></tr>
+      <tr><th>评标时间</th><td>2026-11-16 09:30</td></tr>
+      <tr><th>评标地点</th><td>市公共资源交易中心三楼第二评标室</td></tr>
+      <!-- 行内标签字段：手机号被 <b>/<span> 拆成三个文本节点 -->
+      <tr><th>联系人手机号</th><td><b>138</b><span>1234</span><span>5678</span></td></tr>
+      <!-- 非目标标签：座机号不得被遮盖 -->
+      <tr><th>联系电话（座机）</th><td>010-88889999</td></tr>
+    </table>
+  </section>
+
+  <section id="section-bidders">
+    <h2>二、投标人代表信息</h2>
+    <!-- 行内“标签：值”：标签文字、冒号与号码分布在多个节点 -->
+    <p>
+      采购代理机构现场联系人信息登记如下：
+      <strong>联系人手机号</strong>：<span>159</span><span>9876</span><span>5432</span>，
+      请保持通讯畅通。
+    </p>
+    <!-- 无标签的正文中出现手机号：不在字段范围内，必须原样保留 -->
+    <p>如对评标流程有疑问，可在工作时间拨打监督电话 13700001234 反映情况。</p>
+
+    <table>
+      <thead>
+        <tr><th>序号</th><th>投标人</th><th>授权代表</th><th>身份证号</th><th>联系人手机号</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>甲市绿苑园林工程有限公司</td>
+          <td>赵建国</td>
+          <!-- 身份证号被三个内联标签拆分，须跨节点识别并整格遮盖 -->
+          <td><span>110101</span><span>19900307</span><span>8131</span></td>
+          <!-- 手机号被两个内联标签拆分 -->
+          <td><b>186</b><b>00001111</b></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>乙市青禾生态建设有限公司</td>
+          <td>孙丽华</td>
+          <td><span>310104</span><span>19850612</span><span>2045</span></td>
+          <td><span>150</span><span>1234</span><span>1234</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>丙城市政园林集团有限公司</td>
+          <td>周文斌</td>
+          <!-- 15 位旧版身份证号 -->
+          <td>110101880615321</td>
+          <td><span>133</span>-<span>5555</span>-<span>6666</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>三、评标结论</h2>
+    <p>评标委员会按照招标文件规定的评分办法独立打分，推荐中标候选人顺序将在中标候选人公示中另行发布。</p>
+    <p>本纪要关联以下同站附表，公开前须一并脱敏：</p>
+    <ul>
+      <li><a href="/minutes/m001-appendix-opening.html">附表一：开标记录表</a></li>
+      <li><a href="m001-appendix-contacts.html">附表二：投标人联系方式附表</a></li>
+      <!-- 重复链接，发现阶段应去重 -->
+      <li><a href="/minutes/m001-appendix-opening.html">开标记录表（重复登记）</a></li>
+    </ul>
+  </section>
+</article>
+</body>
+</html>

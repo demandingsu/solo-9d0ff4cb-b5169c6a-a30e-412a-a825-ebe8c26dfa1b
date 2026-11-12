@@ -1,8 +1,13 @@
-# 采购公告采集 API
+# 采购公告采集 / 评标纪要脱敏 API
 
-传入**采购公告列表页 URL** 与**项目编号**，自动抓取该页指向的同站点原公告与更正公告，
-从详情页提取发布时间、投标截止时间与取消采购信息，按发布时间合并后返回：
-当前是否可投标、有效截止时间、项目状态以及全部来源链接。
+本服务提供两组能力：
+
+1. **公告采集**：传入**采购公告列表页 URL** 与**项目编号**，自动抓取该页指向的同站点
+   原公告与更正公告，从详情页提取发布时间、投标截止时间与取消采购信息，按发布时间合并后
+   返回当前是否可投标、有效截止时间、项目状态以及全部来源链接。
+2. **评标纪要脱敏预览**：传入**纪要详情页 URL**，抓取该页及其链接的同站 HTML 附表，
+   只遮盖标有“身份证号”或“联系人手机号”的字段，返回保留正文与表格结构的脱敏 HTML
+   和命中位置；号码被内联标签拆成多个文本节点时仍可跨节点识别并整字段遮盖。
 
 ## 业务规则
 
@@ -32,12 +37,14 @@
 │   ├── collector.py   # 采集编排：列表发现 → 并发抓取 → 归属判定 → 合并
 │   ├── parser.py      # HTML 解析：同站链接发现、三层字段提取、取消识别
 │   ├── merger.py      # 业务合并规则（时间继承、延期覆盖、取消、待核实）
+│   ├── redaction.py   # 脱敏引擎：跨节点识别、整字段遮盖、同站附表发现、预览编排
 │   └── models.py      # 请求/响应 Pydantic 模型
-├── sample-site/       # 本地示例公告站点（nginx 静态托管）
+├── sample-site/       # 本地示例站点（nginx 静态托管，完全离线）
 │   ├── list.html      # 公告列表页（含外站/登录干扰链接）
-│   └── detail/        # 3 个项目的原公告/更正/取消详情页
+│   ├── detail/        # 3 个项目的原公告/更正/取消详情页
+│   └── minutes/       # 评标纪要与同站附表样例（含拆分节点号码与失败场景）
 ├── nginx/default.conf # 示例站点 nginx 配置（缺失页面返回真实 404）
-├── tests/             # 解析/合并单测 + 本地静态服务器端到端测试（30 个用例）
+├── tests/             # 解析/合并/脱敏单测 + 本地静态服务器端到端测试
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
@@ -90,6 +97,93 @@ curl "http://localhost:8000/api/v1/collect?list_url=http://localhost:8080/list.h
 }
 ```
 
+## 评标纪要脱敏预览 API
+
+### 脱敏规则
+
+| 规则 | 实现位置 |
+| --- | --- |
+| 只处理标有 **“身份证号”/“联系人手机号”** 的字段；无标签正文中的号码、座机号、传真号、项目编号等一律原样保留 | `app/redaction.py` |
+| 号码被 `<span>/<b>/<font>` 等内联标签拆成多个文本节点时，先拼接字段内全部文本节点并归一化（去空白、连字符等）再识别，**命中则遮盖整个字段** | `app/redaction.py::redact_html` |
+| 兼容行式表格（`th/td` 同行）、列式表格（标签在 `thead`）、定义列表（`dt/dd`）、行内“标签：值”四种形态 | `app/redaction.py::_scan_*` |
+| 遮盖标记固定为 `[已脱敏]`，长度不随原值变化；输出保留正文、表格与文档结构 | `app/redaction.py` |
+| 命中位置仅含字段类型、人工可读坐标（表格行列/定义列表/行内）、最近小节标题与 CSS 路径；**预览、位置说明、报错均不回显原始号码**，位置文本中的长数字串会被净化 | `app/redaction.py` |
+| 每页脱敏后做残留自检（已识别号码不得出现在输出中），自检失败按该页脱敏失败处理 | `app/redaction.py` |
+| 只抓取纪要页链接的**同站 HTML 附表（一跳，不递归）**；外站、登录/导航、页内锚点、PDF/ZIP/图片等资源自动忽略 | `app/redaction.py::discover_appendix_links` |
+| **全有或全无**：任一关联页读取或脱敏失败（404/超时、非 HTML 内容、自检失败等）时不返回任何半成品 HTML，`pages` 为空并在 `failed_sources` 列出全部失败来源（仅 URL + 固定原因码） | `app/redaction.py::build_redaction_preview` |
+
+失败原因码：`FETCH_ERROR`（抓取失败，如 404/超时）、`UNSUPPORTED_CONTENT`（非 HTML 内容）、
+`REDACTION_ERROR`（脱敏处理或残留自检失败）。
+
+### 调用方式
+
+```bash
+# POST
+curl -X POST http://localhost:8000/api/v1/redact/preview \
+  -H 'Content-Type: application/json' \
+  -d '{"detail_url":"http://localhost:8080/minutes/m001-review.html"}'
+
+# GET（便于浏览器快速验证）
+curl "http://localhost:8000/api/v1/redact/preview?detail_url=http://localhost:8080/minutes/m001-review.html"
+```
+
+成功响应（节选）：
+
+```json
+{
+  "detail_url": "http://localhost:8080/minutes/m001-review.html",
+  "ok": true,
+  "pages": [
+    {
+      "url": ".../m001-review.html",
+      "role": "detail",
+      "title": "市政绿化养护服务采购项目评标纪要",
+      "redacted_html": "<html>...<td>[已脱敏]</td>...</html>",
+      "hits": [
+        {
+          "field_type": "mobile",
+          "label": "联系人手机号",
+          "location": "第 1 个表格第 5 行第 2 列（联系人手机号字段）",
+          "context": "一、评标基本信息",
+          "css_path": "html > body > article > ... > td:nth-of-type(1)"
+        }
+      ],
+      "hit_count": 8
+    }
+  ],
+  "failed_sources": [],
+  "total_hits": 16,
+  "warnings": []
+}
+```
+
+关联页失败时的响应（不返回任何脱敏 HTML）：
+
+```json
+{
+  "ok": false,
+  "pages": [],
+  "failed_sources": [
+    {"url": ".../m002-appendix-missing.html", "role": "appendix", "reason": "FETCH_ERROR"},
+    {"url": ".../m002-notes.txt", "role": "appendix", "reason": "UNSUPPORTED_CONTENT"}
+  ],
+  "total_hits": 0,
+  "warnings": ["存在读取或脱敏失败的来源，已取消本次预览且不返回部分结果"]
+}
+```
+
+### 示例纪要与附表（`sample-site/minutes/`）
+
+| 文件 | 场景 |
+| --- | --- |
+| `m001-review.html` | 评标纪要详情：表格/行内两种字段形态，号码被多个内联标签拆分；含无标签手机号、座机号等**不应被遮盖**的干扰项；链接两个同站附表，另含外站、登录、锚点、PDF、重复链接 |
+| `m001-appendix-opening.html` | 附表一：列式表格，拆分节点号码，含被忽略的 PDF 链接 |
+| `m001-appendix-contacts.html` | 附表二：`dt/dd` 定义列表与跨标签行内字段，含应保留的单位地址与传真号 |
+| `m002-review.html` | 第二个纪要：关联一个已下线附表（nginx 返回真实 404）和一个纯文本附表，演示**全有或全无**的失败响应 |
+| `assets/m002-notes.txt` | 非 HTML 关联资源，触发 `UNSUPPORTED_CONTENT` 失败原因 |
+
+
+
 ## 示例站点内置的三个演示项目
 
 | 项目编号 | 场景 | 预期结果 |
@@ -140,3 +234,9 @@ pytest -q
   即使详情页下线（只能看到列表行）也能正确判定失败是否与目标项目相关；
   无关项目的坏链接不会污染查询结果。
 - 详情页并发抓取（上限 5），统一超时、自定义 UA、跟随重定向。
+- 脱敏预览的失败处理与采集接口刻意不同：公开前的脱敏必须保证“全有或全无”，
+  因此任一关联页读取/脱敏失败都返回 `ok=false` 且不带任何 HTML，避免半成品外泄；
+  所有对外文本（命中位置、标题、告警、错误码）都经过数字串净化，原始号码只在
+  内存中用于识别与残留自检，不进入日志之外的任何响应字段。
+- 脱敏识别范围严格限定在两个标签字段内，避免对正文做全局正则替换而误伤
+  公告中的其他数字内容；标签字段内再做跨节点归一化识别，兼顾安全与保真。

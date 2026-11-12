@@ -74,3 +74,62 @@ class FetchResponse(BaseModel):
     sources: list[SourceLink] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     fetched_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+# 脱敏预览
+# --------------------------------------------------------------------------- #
+class RedactionRequest(BaseModel):
+    """脱敏预览请求：纪要详情页 URL。"""
+
+    detail_url: HttpUrl = Field(..., description="评标纪要详情页 URL")
+    timeout: float = Field(10.0, ge=1.0, le=60.0, description="单次请求超时时间（秒）")
+
+
+class RedactionHit(BaseModel):
+    """单个命中位置；仅描述位置，不含原始号码。"""
+
+    field_type: str = Field(..., description="字段类型：id_card / mobile")
+    label: str = Field(..., description="命中的字段标签原文，如“身份证号”")
+    location: str = Field(..., description="人工可读的结构坐标，如表格行列或行内字段说明")
+    context: str | None = Field(None, description="所在最近小节标题（净化后，不含长数字）")
+    css_path: str = Field(..., description="字段容器的 CSS 结构坐标，便于程序化定位")
+
+
+class RedactedPage(BaseModel):
+    """单页脱敏结果（详情页或同站附表）。"""
+
+    url: HttpUrl
+    role: str = Field(..., description="detail / appendix")
+    title: str
+    redacted_html: str = Field(..., description="保留正文与表格结构的脱敏后完整 HTML")
+    hits: list[RedactionHit] = Field(default_factory=list)
+    hit_count: int = 0
+
+
+class FailedSource(BaseModel):
+    """读取或脱敏失败的来源；只有 URL、角色与固定原因码，不回显任何原值。"""
+
+    url: HttpUrl
+    role: str = Field(..., description="detail / appendix")
+    reason: str = Field(
+        ...,
+        description="固定原因码：FETCH_ERROR / UNSUPPORTED_CONTENT / REDACTION_ERROR",
+    )
+
+
+class RedactionResponse(BaseModel):
+    """脱敏预览响应。
+
+    ``ok=False`` 时 ``pages`` 必为空（全有或全无），失败来源见 ``failed_sources``。
+    """
+
+    detail_url: HttpUrl
+    ok: bool = Field(..., description="全部来源读取并脱敏成功时为 true")
+    pages: list[RedactedPage] = Field(
+        default_factory=list, description="ok=false 时恒为空列表，绝不返回半成品预览"
+    )
+    failed_sources: list[FailedSource] = Field(default_factory=list)
+    total_hits: int = 0
+    warnings: list[str] = Field(default_factory=list)
+    fetched_at: datetime
